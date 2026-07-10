@@ -7,10 +7,13 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 
 class MainActivity : AppCompatActivity() {
@@ -27,6 +30,14 @@ class MainActivity : AppCompatActivity() {
         adView = AdView(this).apply {
             setAdSize(AdSize.BANNER)
             adUnitId = "ca-app-pub-5015878857432448/5769337587"
+            adListener = object : AdListener() {
+                override fun onAdLoaded() {
+                    Toast.makeText(this@MainActivity, "Anuncio cargado correctamente", Toast.LENGTH_SHORT).show()
+                }
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    Toast.makeText(this@MainActivity, "Fallo al cargar anuncio: ${error.message} (código ${error.code})", Toast.LENGTH_LONG).show()
+                }
+            }
         }
 
         val root = LinearLayout(this).apply {
