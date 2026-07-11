@@ -57,6 +57,10 @@ class MainActivity : AppCompatActivity() {
         settings.loadWithOverviewMode = true
         settings.setSupportZoom(false)
         settings.textZoom = 100
+        // always fetch the latest game HTML from the network instead of serving a stale
+        // cached copy - this app updates purely by editing the web repo, so a cached page
+        // can silently hide bug fixes from the player for a long time otherwise
+        settings.cacheMode = WebSettings.LOAD_NO_CACHE
 
         webView.webViewClient = WebViewClient()
         webView.setInitialScale(1)
