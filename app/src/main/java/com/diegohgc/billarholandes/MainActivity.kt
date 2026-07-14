@@ -1,8 +1,10 @@
 package com.diegohgc.billarholandes
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,6 +16,8 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.MobileAds
+
+private const val GAME_URL = "https://diegohgc.github.io/billar-holandes/?app=android"
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -62,9 +66,41 @@ class MainActivity : AppCompatActivity() {
         // can silently hide bug fixes from the player for a long time otherwise
         settings.cacheMode = WebSettings.LOAD_NO_CACHE
 
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            // Google bloquea el login OAuth dentro de un WebView embebido (error
+            // disallowed_useragent); en cuanto la navegacion vaya a accounts.google.com la
+            // abrimos en el navegador del sistema, que si esta permitido.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url
+                if (url.host?.contains("accounts.google.com") == true) {
+                    startActivity(Intent(Intent.ACTION_VIEW, url))
+                    return true
+                }
+                return false
+            }
+        }
         webView.setInitialScale(1)
-        webView.loadUrl("https://diegohgc.github.io/billar-holandes/")
+        webView.loadUrl(GAME_URL)
+
+        handleAuthCallbackIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthCallbackIntent(intent)
+    }
+
+    // tras completar el login en el navegador externo, Supabase redirige a
+    // puckslide://auth-callback#access_token=...; el sistema reabre esta Activity con ese intent,
+    // y aqui recargamos el juego con ese mismo trozo (#...) para que supabase-js recoja la sesion
+    // exactamente igual que hace en el navegador normal.
+    private fun handleAuthCallbackIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "puckslide") return
+        val fragment = data.encodedFragment
+        val url = if (fragment != null) "$GAME_URL#$fragment" else GAME_URL
+        webView.loadUrl(url)
     }
 
     @Deprecated("Deprecated in Java")
