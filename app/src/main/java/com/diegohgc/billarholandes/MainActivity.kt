@@ -1,6 +1,7 @@
 package com.diegohgc.billarholandes
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
@@ -73,7 +74,15 @@ class MainActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
                 if (url.host?.contains("accounts.google.com") == true) {
-                    startActivity(Intent(Intent.ACTION_VIEW, url))
+                    // se fuerza Chrome porque es el que gestiona de forma fiable la redireccion
+                    // final (via script) hacia el esquema puckslide://; otros navegadores como
+                    // Firefox pueden ignorarla o mostrarla como texto en vez de reabrir la app
+                    val intent = Intent(Intent.ACTION_VIEW, url).setPackage("com.android.chrome")
+                    try {
+                        startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        startActivity(Intent(Intent.ACTION_VIEW, url))
+                    }
                     return true
                 }
                 return false
