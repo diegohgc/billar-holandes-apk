@@ -4,13 +4,17 @@ import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.ads.AdRequest
@@ -30,6 +34,7 @@ class MainActivity : AppCompatActivity() {
 
         MobileAds.initialize(this)
 
+        WebView.setWebContentsDebuggingEnabled(true)
         webView = WebView(this)
         adView = AdView(this).apply {
             setAdSize(AdSize.BANNER)
@@ -69,23 +74,35 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient = object : WebViewClient() {
             // Google bloquea el login OAuth dentro de un WebView embebido (error
-            // disallowed_useragent); en cuanto la navegacion vaya a accounts.google.com la
-            // abrimos en el navegador del sistema, que si esta permitido.
+            // disallowed_useragent). Un Intent normal a Chrome tampoco vale: Chrome detecta que la
+            // app que lo abre sigue teniendo su propio WebView activo y se cierra solo sin mostrar
+            // nada (mismo bloqueo, aplicado a nivel de Android). La forma que Google si acepta es
+            // Chrome Custom Tabs (libreria androidx.browser), pensada justamente para este caso.
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
                 if (url.host?.contains("accounts.google.com") == true) {
-                    // se fuerza Chrome porque es el que gestiona de forma fiable la redireccion
-                    // final (via script) hacia el esquema puckslide://; otros navegadores como
-                    // Firefox pueden ignorarla o mostrarla como texto en vez de reabrir la app
-                    val intent = Intent(Intent.ACTION_VIEW, url).setPackage("com.android.chrome")
+                    // se fuerza Chrome porque es el unico navegador confirmado que Google acepta
+                    // para este flujo; otros navegadores (Firefox) pueden bloquear igualmente el
+                    // redirect final hacia el esquema puckslide:// o el propio login de Google
+                    val customTabsIntent = CustomTabsIntent.Builder().build()
+                    customTabsIntent.intent.setPackage("com.android.chrome")
                     try {
-                        startActivity(intent)
+                        customTabsIntent.launchUrl(this@MainActivity, url)
                     } catch (e: ActivityNotFoundException) {
-                        startActivity(Intent(Intent.ACTION_VIEW, url))
+                        customTabsIntent.intent.setPackage(null)
+                        customTabsIntent.launchUrl(this@MainActivity, url)
                     }
                     return true
                 }
                 return false
+            }
+        }
+        // sin esto, alert()/confirm() y console.log() de la pagina no llegan a ningun sitio: se
+        // pierden en silencio porque un WebView plano no gestiona esos dialogos/mensajes de JS.
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.d("WebConsole", "${message.message()} (${message.sourceId()}:${message.lineNumber()})")
+                return true
             }
         }
         webView.setInitialScale(1)
@@ -100,16 +117,20 @@ class MainActivity : AppCompatActivity() {
         handleAuthCallbackIntent(intent)
     }
 
-    // tras completar el login en el navegador externo, Supabase redirige a
-    // puckslide://auth-callback#access_token=...; el sistema reabre esta Activity con ese intent,
-    // y aqui recargamos el juego con ese mismo trozo (#...) para que supabase-js recoja la sesion
+    // tras completar el login en el navegador externo, Supabase redirige a auth-bridge.html, que
+    // relanza esta app con un intent:// explicito (package=com.diegohgc.billarholandes) llevando
+    // el token como query param "authFragment" (un intent:// no admite '#' antes de "#Intent").
+    // Aqui lo recolocamos como fragmento real de la URL del juego para que supabase-js lo procese
     // exactamente igual que hace en el navegador normal.
     private fun handleAuthCallbackIntent(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme != "puckslide") return
-        val fragment = data.encodedFragment
-        val url = if (fragment != null) "$GAME_URL#$fragment" else GAME_URL
-        webView.loadUrl(url)
+        if (data.host != "diegohgc.github.io") return
+        val authFragment = data.getQueryParameter("authFragment") ?: return
+        val url = "$GAME_URL#$authFragment"
+        // si se navega justo cuando la Activity todavia esta volviendo a primer plano (recien
+        // cerrado el Custom Tab), el WebView a veces no repinta la pantalla aunque la pagina si
+        // cargue el token correctamente; posponerlo al siguiente frame de la UI lo evita
+        webView.post { webView.loadUrl(url) }
     }
 
     @Deprecated("Deprecated in Java")

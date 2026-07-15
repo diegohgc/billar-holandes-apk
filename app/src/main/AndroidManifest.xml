@@ -24,14 +24,19 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- recibe la vuelta del login de Google con Supabase tras pasar por el navegador externo -->
+            <!-- recibe la vuelta del login de Google con Supabase: auth-bridge.html usa un
+                 intent:// con package= para abrir esta app de forma directa y explicita, sin
+                 depender de la verificacion de App Links (que resulto poco fiable en pruebas) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="puckslide" android:host="auth-callback" />
+                <data
+                    android:scheme="https"
+                    android:host="diegohgc.github.io"
+                    android:pathPrefix="/billar-holandes/" />
             </intent-filter>
         </activity>
     </application>
