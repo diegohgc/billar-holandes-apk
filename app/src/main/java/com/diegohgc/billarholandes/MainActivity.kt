@@ -126,7 +126,11 @@ class MainActivity : AppCompatActivity() {
         val data = intent?.data ?: return
         if (data.host != "diegohgc.github.io") return
         val authFragment = data.getQueryParameter("authFragment") ?: return
-        val url = "$GAME_URL#$authFragment"
+        // si la URL solo cambia en el "#..." respecto a la ya cargada, el WebView lo trata como
+        // una navegacion dentro del mismo documento (como un ancla) y NO vuelve a ejecutar el
+        // script de la pagina - por eso supabase-js nunca llegaba a leer el token nuevo. Anadir
+        // un parametro que cambie cada vez fuerza una recarga completa de verdad.
+        val url = "$GAME_URL&_t=${System.currentTimeMillis()}#$authFragment"
         // si se navega justo cuando la Activity todavia esta volviendo a primer plano (recien
         // cerrado el Custom Tab), el WebView a veces no repinta la pantalla aunque la pagina si
         // cargue el token correctamente; posponerlo al siguiente frame de la UI lo evita
