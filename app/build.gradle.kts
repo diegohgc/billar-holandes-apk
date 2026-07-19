@@ -22,7 +22,7 @@ android {
         applicationId = "com.diegohgc.billarholandes"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
